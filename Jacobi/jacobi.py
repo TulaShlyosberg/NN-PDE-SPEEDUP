@@ -1,3 +1,14 @@
+import torch
+from torch import nn
+from torch import optim
+
+import numpy as np
+import scipy.stats as sps
+from tqdm.notebook import tqdm
+from time import time
+import json
+import os
+
 class DatasetGenerator:
 
     def __init__(self, N):
@@ -82,14 +93,19 @@ class DatasetGenerator:
 
 
 
-    def __call__(self, num_sample=500, batch_size=100, dir="", save=True):
+    def __call__(self, num_sample=500, batch_size=100, dir="", save=True,
+	    print_every=None):
         """
         Генерирует датасет и сохраняет батчи в директорию
         num_samples --- количество элементов датасета
         batch_size ---  размер батча
         dir --- директория датасета
+	    print_every --- как часто записывать в историю
         """
         assert num_sample % batch_size == 0, "Некорректный размер батча"
+
+        if (print_every == None):
+            print_every = self.N
 
         labels_file_name = os.path.join(dir, 'labels.json')
         try:
@@ -119,7 +135,7 @@ class DatasetGenerator:
             max_it = self.N ** 2
             history = np.zeros(
                 (batch_size, 
-                max_it // self.N, self.N + 1, 
+                max_it // print_every, self.N + 1, 
                 self.N + 1)
                 )
             
@@ -138,8 +154,8 @@ class DatasetGenerator:
                                         u[:, x_index - 1, y_index] + 
                                         u[:, x_index, y_index + 1] + 
                                         u[:, x_index, y_index - 1] - h ** 2 * f)
-                if (j % self.N == 0):
-                    history[:, j // self.N] = u
+                if (j % print_every == 0):
+                    history[:, j // print_every] = u
             
             # посмотрим неувязку для первого уравнения
             u_new = u[-1].copy()
@@ -166,8 +182,8 @@ class DatasetGenerator:
         with open(labels_file_name, 'r') as labels_file:
             labels = json.load(labels_file)
 
-	if (slice != None):
-	    labels = labels[slice]
+        if (slice != None):
+            labels = labels[slice]
 
         result = dict()
         for label in labels:
@@ -238,3 +254,4 @@ class Autoencoder(nn.Module):
         x = self.decoder(x)
         x = x.view(batch_size, N + 1, N + 1) * batch_max_x
         return x
+
